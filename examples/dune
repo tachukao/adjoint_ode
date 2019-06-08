@@ -1,0 +1,3 @@
+(executables
+ (names initial_condition_adjoint params_adjoint)
+ (libraries owl owl-ode owl-ode-sundials))
