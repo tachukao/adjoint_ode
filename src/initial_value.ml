@@ -54,15 +54,26 @@ module Make (P : PT) = struct
 
 
   (* backward pass through time *)
-  let backward loss =
+  let backward ~loss =
     let dloss = Algodiff.D.grad loss in
     fun x1 ->
-      let c = loss (Algodiff.D.pack_arr x1) |> Algodiff.D.unpack_flt in
+      let l = loss (Algodiff.D.pack_arr x1) |> Algodiff.D.unpack_flt in
       let s1 =
         let a1 = dloss Algodiff.D.(pack_arr x1) |> Algodiff.D.unpack_arr in
         Mat.(x1 @= a1)
       in
       let tspec = Types.(T1 { t0 = t1; dt = -.dt; duration = -.duration }) in
       let _, adj_ss = Ode.odeint (module Owl_Cvode) adj_f s1 tspec () in
-      c, Mat.col adj_ss (-1)
+      Mat.col adj_ss (-1), l
+
+
+  (* gradient at x0 : returns dx0 and loss *)
+  let grad ~loss =
+    let backward = backward ~loss in
+    fun x0 ->
+      (* run the dynamics forward from current guess of x0 *)
+      let x1 = forward x0 in
+      (* calculate the loss l and its gradient with respect to x0 *)
+      let s0, l = backward x1 in
+      Mat.(s0.${[ [ dim; -1 ] ]}), l
 end

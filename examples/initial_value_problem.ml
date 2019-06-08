@@ -32,15 +32,11 @@ let loss x1 = Algodiff.D.Maths.(l2norm_sqr' (x1 - target))
 
 (* vanilla gradient descent *)
 let rec learn =
-  let backward = Solver.backward loss in
+  let grad = Solver.grad ~loss in
   fun step x0 l' ->
-    (* run the dynamics forward from current guess of x0 *)
-    let x1 = Solver.forward x0 in
     (* calculate the loss l and its gradient with respect to x0 *)
-    let l, dx0 =
-      let l, x0 = backward x1 in
-      l, Mat.(x0.${[ [ Solver.dim; -1 ] ]})
-    in
+    let dx0, l = grad x0 in
+    (* calculate percentage change *)
     let pct_change = (l' -. l) /. l in
     if step < max_iter && pct_change > 1E-4
     then (

@@ -1,4 +1,4 @@
 (executables
- (names initial_value_problem parama_adjoint)
+ (names initial_value_problem params_adjoint)
  (libraries adjoint_ode owl owl-ode owl-ode-sundials))
 
