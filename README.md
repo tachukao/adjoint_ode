@@ -6,7 +6,7 @@ Currently, we have two examples: one solves an intial value problem and the othe
 
 You can run the two examples using the following commands:
 ```sh
-dune exec examples/initial_condition_adjoint.exe
+dune exec examples/initial_value_problem.exe
 ```
 
 ```sh

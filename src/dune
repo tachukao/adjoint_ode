@@ -1,0 +1,3 @@
+(library
+   (name adjoint_ode)
+   (libraries owl owl-ode owl-ode-sundials))
