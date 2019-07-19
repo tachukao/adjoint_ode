@@ -7,7 +7,7 @@ module type PT = sig
   val t1 : float
 end
 
-module Make : functor (P : PT) -> sig
+module Make (P : PT) : sig
   include PT
 
   val duration : float
@@ -25,7 +25,7 @@ module Make : functor (P : PT) -> sig
   val adj_f : Mat.mat -> float -> Mat.mat
 
   (** tspect *)
-  val tspec : Owl_ode.Types.tspec_t
+  val tspec : Owl_ode.Types.tspec
 
   (* forward pass through time *)
   val forward : Mat.mat -> Mat.mat
