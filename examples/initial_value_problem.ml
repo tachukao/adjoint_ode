@@ -54,9 +54,7 @@ let () =
     and duration = Solver.duration in
     Owl_ode.Types.(T1 { t0; dt = 1E-2; duration })
   in
-  let ts, xs =
-    Owl_ode.Ode.odeint (module Owl_ode_odepack.Owl_Lsoda) Solver.f x0 tspec ()
-  in
+  let ts, xs = Owl_ode.Ode.odeint (module Owl_ode_odepack.Lsoda) Solver.f x0 tspec () in
   Mat.save_txt Mat.(transpose (ts @= xs)) "actual_xs";
   let x1 = Mat.col xs (-1) in
   Printf.printf "\n\nx1: actual and target \n%!";

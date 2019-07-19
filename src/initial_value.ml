@@ -49,7 +49,7 @@ module Make (P : PT) = struct
 
   (* forward pass through time *)
   let forward x0 =
-    let _, xs = Ode.odeint (module Owl_Lsoda) f x0 tspec () in
+    let _, xs = Ode.odeint (module Lsoda) f x0 tspec () in
     Mat.col xs (-1)
 
 
@@ -63,7 +63,7 @@ module Make (P : PT) = struct
         Mat.(x1 @= a1)
       in
       let tspec = Types.(T1 { t0 = t1; dt = -.dt; duration = -.duration }) in
-      let _, adj_ss = Ode.odeint (module Owl_Lsoda) adj_f s1 tspec () in
+      let _, adj_ss = Ode.odeint (module Lsoda) adj_f s1 tspec () in
       Mat.col adj_ss (-1), l
 
 

@@ -93,7 +93,6 @@ let target =
 
 
 (* loss with respect to state x at time t *)
-
 let loss t =
   let target = target t in
   fun x -> Algodiff.D.Maths.(l2norm_sqr' (x - target))
