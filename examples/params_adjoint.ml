@@ -148,18 +148,19 @@ let save_xs x0 w =
 
 
 (* gradient + RMSprop to speed up learning *)
-let rec learn step x0 w =
-  if step < max_iter
+let rec learn step x0 w l' =
+  let x1 = forward w x0 in
+  let l, _, dldx0, dldw = backward w x1 in
+  let pct_change = (l' -. l) /. l in
+  if step < max_iter && pct_change > 1E-4
   then (
     let open Algodiff.D in
-    let x1 = forward w x0 in
-    let l, _, dldx0, dldw = backward w x1 in
     let w = Maths.(w - (F alpha * dldw)) in
     let x0 = Maths.(x0 - (F alpha * dldx0)) in
-    if step mod 10 = 0 then Printf.printf "\rstep %i | loss %4.5f%!" step l;
+    if step mod 10 = 0 then Printf.printf "\rstep %i | loss %4.5f | pct change %4.5f %!" step l pct_change;
     (* save the dynamics every 100 gradient steps *)
     if step mod 100 = 0 then save_xs x0 w;
-    learn (succ step) x0 w)
+    learn (succ step) x0 w l)
   else x0, w
 
 
@@ -179,6 +180,6 @@ let () =
   (* initial guess of paramter w *)
   let w = Algodiff.D.Mat.uniform ~a:(-0.01) ~b:0.01 n n in
   (* learning x0 and w *)
-  let x0, w = learn 0 x0 w in
+  let x0, w = learn 0 x0 w 1E9 in
   (* save learnt dynamics *)
   save_xs x0 w
