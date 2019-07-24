@@ -37,10 +37,10 @@ let rec learn =
     (* calculate the loss l and its gradient with respect to x0 *)
     let dx0, l = grad x0 in
     (* calculate percentage change *)
-    let pct_change = (l' -. l) /. l in
-    if step < max_iter && pct_change > 1E-4
+    let pct_change = (l' -. l) /. l' in
+    if step < max_iter && pct_change > 1E-4 && l > 1E-3
     then (
-      if step mod 1 = 0 then Printf.printf "\riter %i | loss %3.3f %!" step l;
+      if step mod 1 = 0 then Printf.printf "\riter %i | loss %4.3f | pct change %4.5f %!" step l pct_change;
       let x0 = Mat.(x0 - (alpha $* dx0)) in
       learn (succ step) x0 l)
     else x0
