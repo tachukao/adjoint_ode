@@ -44,7 +44,7 @@ end
 let t0 = 0.
 let t1 = 2.
 let duration = t1 -. t0
-let dt = t1
+let dt = 0.5
 let tspec = Types.(T1 { t0; dt; duration })
 
 (* define the dynamical system model: 
@@ -82,7 +82,7 @@ let adjf w s _t =
 
 (* learnig rate and maximum gradient iterations *)
 let alpha = 1E-2
-let max_iter = 10000
+let max_iter = 30000
 
 (* target at time t *)
 let target =
