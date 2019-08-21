@@ -3,6 +3,7 @@ module type PT = sig
   val fd : Owl.Algodiff.D.t -> float -> Owl.Algodiff.D.t
   val t0 : float
   val t1 : float
+  val dt : float
 end
 
 module Make (P : PT) = struct
@@ -44,7 +45,7 @@ module Make (P : PT) = struct
 
   (* time specification *)
   let duration = t1 -. t0
-  let dt = duration
+  let dt = dt (*duration*)
   let tspec = Types.(T1 { t0; dt; duration })
 
   (* forward pass through time *)

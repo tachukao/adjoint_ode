@@ -5,6 +5,7 @@ module type PT = sig
   val fd : Owl.Algodiff.D.t -> float -> Owl.Algodiff.D.t
   val t0 : float
   val t1 : float
+  val dt : float
 end
 
 module Make (P : PT) : sig

@@ -12,6 +12,7 @@ module Solver = Adjoint_ode.IVP.Make (struct
   let dim = 2
   let t0 = 0.
   let t1 = 10.
+  let dt = 0.5
 
   (* differentiable dynamical equation dxdt = fd(x,t) *)
   let fd =
