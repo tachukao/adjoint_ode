@@ -1,6 +1,7 @@
 (* code ported from https://github.com/rtqichen/torchdiffeq/blob/master/examples/latent_ode.py *)
 
 open Owl
+open Adjoint_ode.Helper
 
 let a = 0.
 let b = 0.3
@@ -54,21 +55,9 @@ let data =
   orig, samp, orig_ts, samp_ts
 
 
-let save_bin filename m =
-  let output = open_out filename in
-  Marshal.to_channel output m [ Marshal.No_sharing ];
-  close_out output
-
-
-(* reads whatever was saved using [save_bin] *)
-let read_bin filename =
-  let input = open_in filename in
-  let m = Marshal.from_channel input in
-  close_in input;
-  m
 
 
 let () =
-  Mat.save_txt cw_traj "dataset/cw_spiral";
-  Mat.save_txt cc_traj "dataset/cc_spiral";
-  save_bin "dataset/spiral_dataset" data
+  Mat.save_txt cw_traj "data/cw_spiral";
+  Mat.save_txt cc_traj "data/cc_spiral";
+  save_bin "data/spiral_dataset" data
