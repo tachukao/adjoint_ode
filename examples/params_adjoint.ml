@@ -5,11 +5,14 @@ open Adjoint_ode.Solvers
 (* dimension of state-space *)
 let n = 4
 
+(* dimension of observations *)
+let n_obs = 2
+
 (* time specification *)
 let t0 = 0.
 let t1 = 2.
 let duration = t1 -. t0
-let dt = 0.1
+let dt = 0.5
 let tspec = Types.(T1 { t0; dt; duration })
 
 (* define the dynamical system model: 
@@ -49,21 +52,23 @@ let negadjf w s _t =
 
 
 (* learnig rate and maximum gradient iterations *)
-let alpha = 2E-3
+let alpha = 5E-3
 let max_iter = 30000
 
 (* target at time t *)
 let target =
   let omega = 3. in
   fun t ->
-    [| Maths.sin (omega *. t); Maths.cos (omega *. t) -. 1.; 2. *. t; -.t -. 1. |]
-    |> fun x -> Owl.Mat.of_array x n 1 |> Algodiff.D.pack_arr
+    [| Maths.sin (omega *. t); Maths.cos (omega *. t) -. 1. |]
+    |> fun x -> Owl.Mat.of_array x n_obs 1 |> Algodiff.D.pack_arr
 
 
 (* loss with respect to state x at time t *)
 let loss t =
   let target = target t in
-  fun x -> Algodiff.D.Maths.(l2norm_sqr' (x - target))
+  fun x ->
+    let x = Algodiff.D.Maths.get_slice [ [ 0; pred n_obs ] ] x in
+    Algodiff.D.Maths.(l2norm_sqr' (x - target))
 
 
 (* derivative of loss with repsect to x at time t *)
@@ -109,13 +114,13 @@ let backward w x1 =
 
 
 (* helper function to save xs *)
-let save_xs x0 w =
+let save x0 w =
   let tspec = Types.(T1 { t0; dt = 1E-2; duration }) in
   let ts, xs = Ode.odeint (module CSolver) (f w) x0 tspec () in
-  Owl.Mat.save_txt Owl.Mat.(transpose (ts @= xs)) "actual_xs"
+  Owl.Mat.save_txt Owl.Mat.(transpose (ts @= xs)) "results/actual_xs"
 
 
-(* gradient + RMSprop to speed up learning *)
+(* gradient descent *)
 let rec learn step x0 w l' =
   let x1 = forward w x0 in
   let l, _, dldx0, dldw = backward w x1 in
@@ -128,7 +133,7 @@ let rec learn step x0 w l' =
     if step mod 10 = 0
     then Printf.printf "\rstep %i | loss %4.5f | pct change %4.5f %!" step l pct_change;
     (* save the dynamics every 100 gradient steps *)
-    if step mod 100 = 0 then save_xs x0 w;
+    if step mod 100 = 0 then save x0 w;
     learn (succ step) x0 w l)
   else x0, w
 
@@ -143,7 +148,7 @@ let () =
     |> Mat.concatenate ~axis:1
     |> fun x -> Mat.(ts @= x) |> Mat.transpose
   in
-  Mat.save_txt target_xs "target_xs";
+  Mat.save_txt target_xs "results/target_xs";
   (* initial guess of inital condition *)
   let x0 = Mat.of_array [| 0.1; -0.1; -0.2; -0.5 |] n 1 |> Algodiff.D.pack_arr in
   (* initial guess of paramter w *)
@@ -151,4 +156,4 @@ let () =
   (* learning x0 and w *)
   let x0, w = learn 0 x0 w 1E9 in
   (* save learnt dynamics *)
-  save_xs x0 w
+  save x0 w

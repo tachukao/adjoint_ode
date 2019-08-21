@@ -4,8 +4,8 @@ open Owl_ode
 open Adjoint_ode.Solvers
 
 (* dimension of state-space *)
-let n = 8
-let p = 50
+let n = 4
+let p = 100
 let n_obs = 2
 
 (* time specification *)
@@ -51,8 +51,7 @@ let negadjf dloss w1 b w2 s t =
   let g4 w2 = g w1 b w2 x in
   (* note: we use dloss (t1 -. t) instead of dloss t because we are integrating
      backwards in time *)
-  let ddldx = Maths.neg Maths.(jacobianTv g1 x dldx + dloss (t1 -. t) x) |> primal
-  in
+  let ddldx = Maths.neg Maths.(jacobianTv g1 x dldx + dloss (t1 -. t) x) |> primal in
   let ddldw1 =
     Maths.neg (jacobianTv g2 w1 dldx) |> fun x -> Maths.reshape x [| -1; 1 |] |> primal
   in
@@ -65,13 +64,9 @@ let negadjf dloss w1 b w2 s t =
   Maths.concatenate ~axis:0 [| dx; ddldx; ddldw1; ddldb; ddldw2 |] |> Maths.neg
 
 
-(* learnig rate and maximum gradient iterations *)
-let alpha = 1E-3
-let max_iter = 100000
-
 (* target at time t *)
 let target t =
-  let r = 3. /. (t1 +. 1. -. t) in
+  let r = 1. /. (t1 +. 1. -. t) in
   [| (r *. sin t) -. 1.; r *. cos t |]
   |> fun x -> Owl.Mat.of_array x n_obs 1 |> Algodiff.D.pack_arr
 
@@ -121,37 +116,36 @@ let backward w1 b w2 x1 =
 
 
 (* helper function to save xs *)
-let save_xs x0 w1 b w2 =
+let save x0 w1 b w2 =
   let tspec = Types.(T1 { t0; dt = 1E-2; duration }) in
   let ts, xs = Ode.odeint (module CSolver) (f w1 b w2) x0 tspec () in
-  Owl.Mat.save_txt Owl.Mat.(transpose (ts @= xs)) "actual_xs";
-  Owl.Mat.save_txt Algodiff.D.(unpack_arr w1) "w1";
-  Owl.Mat.save_txt Algodiff.D.(unpack_arr w2) "w2";
-  Owl.Mat.save_txt Algodiff.D.(unpack_arr b) "b"
+  Owl.Mat.save_txt Owl.Mat.(transpose (ts @= xs)) "results/actual_xs";
+  Owl.Mat.save_txt Algodiff.D.(unpack_arr w1) "results/w1";
+  Owl.Mat.save_txt Algodiff.D.(unpack_arr w2) "results/w2";
+  Owl.Mat.save_txt Algodiff.D.(unpack_arr b) "results/b"
 
 
-(* gradient + RMSprop to speed up learning *)
-let rec learn step x0 w1 b w2 dldw12 dldb2 dldw22 l' =
+(* gradient + RMSprop to speed up learning 
+   TODO: use LBFGS *)
+let rec learn step x0 w1 b w2 l' =
   let x1, l = forward loss w1 b w2 x0 in
   let _, _, dldw1, dldb, dldw2 = backward w1 b w2 x1 in
   let pct_change = (l' -. l) /. l' in
-  if step < max_iter && l > 1E-3
+  if step < 10000 && l > 1E-3
   then (
     let open Algodiff.D in
     (* Adjoint_ode.Helper.print_algodiff_dim w1;
     Adjoint_ode.Helper.print_algodiff_dim dldw1; *)
-    let dldw12 = Maths.((F 0.1 * sqr dldw1) + (F 0.9 * dldw12)) in
-    let dldb2 = Maths.((F 0.1 * sqr dldb) + (F 0.9 * dldb2)) in
-    let dldw22 = Maths.((F 0.1 * sqr dldw2) + (F 0.9 * dldw22)) in
-    let w1 = Maths.(w1 - (F alpha * dldw1 / sqrt dldw12)) in
-    let b = Maths.(b - (F alpha * dldb / sqrt dldb2)) in
-    let w2 = Maths.(w2 - (F alpha * dldw2 / sqrt dldw22)) in
+    let lr = F 1E-5 in
+    let w1 = Maths.(w1 - (lr * dldw1)) in
+    let b = Maths.(b - (lr * dldb)) in
+    let w2 = Maths.(w2 - (lr * dldw2)) in
     (* let x0 = Maths.(x0 - (F alpha * dldx0 / sqrt dldx02)) in *)
     if step mod 10 = 0
     then Printf.printf "\rstep %i | loss %4.5f | pct change %4.7f %!" step l pct_change;
     (* save the dynamics every 100 gradient steps *)
-    if step mod 100 = 0 then save_xs x0 w1 b w2;
-    learn (succ step) x0 w1 b w2 dldw12 dldb2 dldw22 l)
+    if step mod 100 = 0 then save x0 w1 b w2;
+    learn (succ step) x0 w1 b w2 l)
   else x0, w1, b, w2
 
 
@@ -165,25 +159,18 @@ let () =
     |> Mat.concatenate ~axis:1
     |> fun x -> Mat.(ts @= x) |> Mat.transpose
   in
-  Mat.save_txt target_xs "target_xs";
+  Mat.save_txt target_xs "results/target_xs";
   (* initial guess of inital condition *)
-  let x0 = Algodiff.D.Maths.concatenate ~axis:0 [|target 0.; Algodiff.D.Mat.gaussian (n-n_obs) 1|] in
-  (* initial guess of paramter w *)
-  let w1 = Algodiff.D.Mat.uniform ~a:(-0.01) ~b:0.01 p n in
-  let b = Algodiff.D.Mat.uniform ~a:(-0.01) ~b:0.01 p 1 in
-  let w2 = Algodiff.D.Mat.uniform ~a:(-0.01) ~b:0.01 n p in
-  (* learning x0 and w *)
-  let x0, w1, b, w2 =
-    learn
-      0
-      x0
-      w1
-      b
-      w2
-      Algodiff.D.Mat.(ones p n)
-      Algodiff.D.Mat.(ones p 1)
-      Algodiff.D.Mat.(ones n p)
-      1E9
+  let x0 =
+    Algodiff.D.Maths.concatenate
+      ~axis:0
+      [| target 0.; Algodiff.D.Mat.gaussian ~sigma:1E-3 (n - n_obs) 1 |]
   in
+  (* initial guess of paramter w *)
+  let w1 = Algodiff.D.Mat.gaussian ~sigma:1E-3 p n in
+  let b = Algodiff.D.Mat.gaussian ~sigma:1E-3 p 1 in
+  let w2 = Algodiff.D.Mat.gaussian ~sigma:1E-3 n p in
+  (* learning x0 and w *)
+  let x0, w1, b, w2 = learn 0 x0 w1 b w2 1E9 in
   (* save learnt dynamics *)
-  save_xs x0 w1 b w2
+  save x0 w1 b w2
