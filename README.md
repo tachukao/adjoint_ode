@@ -7,6 +7,7 @@ Currently, we have two examples: one solves an intial value problem and the othe
 Example runs of the two examples, including the invocation commands can be found below:
 
 ```sh
+$ mkdir results
 $ dune exec examples/initial_value_problem.exe --profile=release
 iter 203 | loss 0.001 | pct change 0.03960 
 
@@ -22,6 +23,7 @@ R1  0
 ```
 
 ```sh
+$ mkdir results
 $ dune exec examples/params_adjoint.exe --profile=release
-step 14940 | loss 0.12571 | pct change 0.00010 
+step 2520 | loss 0.01008 | pct change 0.00131
 ```
