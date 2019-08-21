@@ -1,62 +1,27 @@
 open Owl
 open Owl_ode
+open Adjoint_ode.Solvers
 
 (* dimension of state-space *)
 let n = 4
-
-(* helper function *)
-let print_dim x =
-  let dims = Algodiff.D.shape x in
-  let d1 = dims.(0)
-  and d2 = dims.(1) in
-  Printf.printf "%i, %i\n%!" d1 d2
-
-
-(* herlper module: custom solver that does the 
- * unpacking and packing of Algodiff arrays 
- * automatically: the states and functions have 
- * type Algodiff.D.t but the outputs are Mat.mat *)
-module CSolver = struct
-  type state = Algodiff.D.t
-  type f = Algodiff.D.t -> float -> Algodiff.D.t
-  type step_output = Mat.mat * float
-  type solve_output = Mat.mat * Mat.mat
-
-  let step f ~dt y0 t0 =
-    let y0 = Algodiff.D.unpack_arr y0 in
-    let f y (t : float) =
-      let y = Algodiff.D.pack_arr y in
-      f y t |> Algodiff.D.unpack_arr
-    in
-    Owl_ode_odepack.lsoda_s ~relative_tol:1E-3 ~abs_tol:1E-3 f ~dt y0 t0
-
-
-  let solve f y0 tspec () =
-    let y0 = Algodiff.D.unpack_arr y0 in
-    let f y (t : float) =
-      let y = Algodiff.D.pack_arr y in
-      f y t |> Algodiff.D.unpack_arr
-    in
-    Owl_ode_odepack.lsoda_i ~relative_tol:1E-3 ~abs_tol:1E-3 f y0 tspec ()
-end
 
 (* time specification *)
 let t0 = 0.
 let t1 = 2.
 let duration = t1 -. t0
-let dt = 0.5
+let dt = 0.1
 let tspec = Types.(T1 { t0; dt; duration })
 
 (* define the dynamical system model: 
- * dx/dt = f(x,t) = w *@ x, where w is 
- * a matrix paramter that we will also 
- * learn *)
+   dx/dt = f(x,t) = w *@ x, where w is 
+   a matrix paramter that we will also 
+   learn *)
 let g w x = Algodiff.D.Maths.(w *@ x)
 let f w x _t = g w x
 
 (* the adjoint state space is a concatenation of the current state x
- * derivative of the loss with respective to x and the derivation
- * of the loss with respect to parameters w *)
+   derivative of the loss with respective to x and the derivation
+   of the loss with respect to parameters w *)
 let extract s =
   let open Algodiff.D in
   let x = Maths.get_slice [ [ 0; pred n ] ] s in
@@ -65,30 +30,33 @@ let extract s =
   x, dldx, dldw
 
 
-(* define the adjoint dynamical system: 
- * ds/dt = adjf(s,w,t) = 
- * [-dx/dt; d(dldx)/dt; d(dl/dw)/dt] *)
-let adjf w s _t =
+(* define the negative adjoint dynamical system: 
+   ds/dt = negadjf(s,w,t) = 
+   [-dx/dt; -d(dldx)/dt; -d(dl/dw)/dt] for integrating the 
+   adjoint state backwards in time *)
+let negadjf w s _t =
   let open Algodiff.D in
   let x, dldx, _ = extract s in
   let w = primal w in
-  let dx = Maths.neg (g w x) |> primal in
+  let dx = g w x |> primal in
   let g1 x = g w x in
   let g2 w = g w x in
   let ddldx = Maths.neg (jacobianTv g1 x dldx) |> primal in
-  let ddldw = jacobianTv g2 w dldx |> fun x -> Maths.reshape x [| -1; 1 |] |> primal in
-  Maths.concatenate ~axis:0 [| dx; ddldx; ddldw |]
+  let ddldw =
+    Maths.neg (jacobianTv g2 w dldx) |> fun x -> Maths.reshape x [| -1; 1 |] |> primal
+  in
+  Maths.concatenate ~axis:0 [| dx; ddldx; ddldw |] |> Maths.neg
 
 
 (* learnig rate and maximum gradient iterations *)
-let alpha = 1E-2
+let alpha = 2E-3
 let max_iter = 30000
 
 (* target at time t *)
 let target =
-  let omega = 1.5 in
+  let omega = 3. in
   fun t ->
-    [| Maths.sin (omega *. t); Maths.cos (omega *. t); t; -.t -. 1. |]
+    [| Maths.sin (omega *. t); Maths.cos (omega *. t) -. 1.; 2. *. t; -.t -. 1. |]
     |> fun x -> Owl.Mat.of_array x n 1 |> Algodiff.D.pack_arr
 
 
@@ -112,11 +80,11 @@ let forward w x0 =
 let backward w x1 =
   (* times at which to evaluate loss and gradients *)
   let dt = 1E-1 in
-  let adjf = adjf w in
+  let negadjf = negadjf w in
   let open Algodiff.D in
   let s1 =
     let dldx = dloss t1 x1 |> primal in
-    Maths.concatenate ~axis:0 [| x1; Maths.(F alpha * dldx); Mat.(zeros (n * n) 1) |]
+    Maths.concatenate ~axis:0 [| x1; dldx; Mat.(zeros (n * n) 1) |]
   in
   (* evaluate and accumulate gradients at intermediate time t *)
   let rec accu s t l =
@@ -128,11 +96,11 @@ let backward w x1 =
       l, x0, dldx, dldw)
     else (
       let tspec = Types.(T1 { t0; dt; duration = dt }) in
-      let _, adjs = Ode.odeint (module CSolver) adjf s tspec () in
+      let _, adjs = Ode.odeint (module CSolver) negadjf s tspec () in
       let s0 = Owl.Mat.col adjs (-1) |> pack_arr in
       let t = t -. dt in
       let x, dldx, dldw = extract s0 in
-      let dldx = Maths.(dldx + (F alpha * dloss t x)) |> primal in
+      let dldx = Maths.(dldx + dloss t x) |> primal in
       let s0 = Maths.concatenate ~axis:0 [| x; dldx; dldw |] in
       let l = l +. (loss t x |> unpack_flt) in
       accu s0 t l)
@@ -152,7 +120,7 @@ let rec learn step x0 w l' =
   let x1 = forward w x0 in
   let l, _, dldx0, dldw = backward w x1 in
   let pct_change = (l' -. l) /. l' in
-  if step < max_iter && pct_change > 1E-4 && l > 1E-3
+  if step < max_iter && l > 1E-2
   then (
     let open Algodiff.D in
     let w = Maths.(w - (F alpha * dldw)) in
