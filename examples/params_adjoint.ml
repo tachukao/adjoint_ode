@@ -148,7 +148,8 @@ let () =
     |> Mat.concatenate ~axis:1
     |> fun x -> Mat.(ts @= x) |> Mat.transpose
   in
-  (try Unix.mkdir "results" 0o777 with Unix.Unix_error(Unix.EEXIST, _, _) -> ());
+  (try Unix.mkdir "results" 0o777 with
+  | Unix.Unix_error (Unix.EEXIST, _, _) -> ());
   Mat.save_txt target_xs "results/target_pa";
   (* initial guess of inital condition *)
   let x0 = Mat.of_array [| 0.1; -0.1; -0.2; -0.5 |] n 1 |> Algodiff.D.pack_arr in

@@ -41,7 +41,8 @@ let rec learn =
     let pct_change = (l' -. l) /. l' in
     if step < max_iter && pct_change > 1E-4 && l > 1E-3
     then (
-      if step mod 1 = 0 then Printf.printf "\riter %i | loss %4.3f | pct change %4.5f %!" step l pct_change;
+      if step mod 1 = 0
+      then Printf.printf "\riter %i | loss %4.3f | pct change %4.5f %!" step l pct_change;
       let x0 = Mat.(x0 - (alpha $* dx0)) in
       learn (succ step) x0 l)
     else x0
@@ -56,7 +57,8 @@ let () =
     Owl_ode.Types.(T1 { t0; dt = 1E-2; duration })
   in
   let ts, xs = Owl_ode.Ode.odeint (module Owl_ode_odepack.Lsoda) Solver.f x0 tspec () in
-  (try Unix.mkdir "results" 0o777 with Unix.Unix_error(Unix.EEXIST, _, _) -> ());
+  (try Unix.mkdir "results" 0o777 with
+  | Unix.Unix_error (Unix.EEXIST, _, _) -> ());
   Mat.save_txt Mat.(transpose (ts @= xs)) "results/actual_ivp";
   let x1 = Mat.col xs (-1) in
   Printf.printf "\n\nx1: actual and target \n%!";
