@@ -17,7 +17,7 @@ module CSolver = struct
       let y = Algodiff.D.pack_arr y in
       f y t |> Algodiff.D.unpack_arr
     in
-    Owl_ode_odepack.lsoda_s ~relative_tol:1E-3 ~abs_tol:1E-3 f ~dt y0 t0
+    Owl_ode_odepack.lsoda_s ~relative_tol:1E-7 ~abs_tol:1E-9 f ~dt y0 t0
 
 
   let solve f y0 tspec () =
@@ -26,5 +26,5 @@ module CSolver = struct
       let y = Algodiff.D.pack_arr y in
       f y t |> Algodiff.D.unpack_arr
     in
-    Owl_ode_odepack.lsoda_i ~relative_tol:1E-3 ~abs_tol:1E-3 f y0 tspec ()
+    Owl_ode_odepack.lsoda_i ~relative_tol:1E-7 ~abs_tol:1E-9 f y0 tspec ()
 end
