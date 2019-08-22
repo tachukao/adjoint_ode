@@ -139,8 +139,10 @@ let backward w1 b1 w2 b2 x1 =
 (* helper function to save xs *)
 let save x0 w1 b1 w2 b2 =
   let tspec = Types.(T1 { t0; dt = 1E-2; duration }) in
-  let ts, xs = Ode.odeint (module CSolver) (f w1 b1 w2 b2) x0 tspec () in
-  Owl.Mat.save_txt Owl.Mat.(transpose (ts @= xs)) "results/actual_xs";
+  let ts, xs = Ode.odeint (module CSolver) (f w1 b w2) x0 tspec () in
+  (try Unix.mkdir "results" 0o777 with
+  | Unix.Unix_error (Unix.EEXIST, _, _) -> ());
+  Owl.Mat.save_txt Owl.Mat.(transpose (ts @= xs)) "results/actual_s";
   Owl.Mat.save_txt Algodiff.D.(unpack_arr w1) "results/w1";
   Owl.Mat.save_txt Algodiff.D.(unpack_arr w2) "results/w2";
   Owl.Mat.save_txt Algodiff.D.(unpack_arr b1) "results/b1";
@@ -186,7 +188,7 @@ let () =
     |> Mat.concatenate ~axis:1
     |> fun x -> Mat.(ts @= x) |> Mat.transpose
   in
-  Mat.save_txt target_xs "results/target_xs";
+  Mat.save_txt target_xs "results/target_s";
   (* initial guess of inital condition *)
   let x0 =
     Algodiff.D.Maths.concatenate

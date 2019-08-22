@@ -46,6 +46,7 @@ module Make (P : PT) = struct
   (* time specification *)
   let duration = t1 -. t0
   let dt = dt (*duration*)
+
   let tspec = Types.(T1 { t0; dt; duration })
 
   (* forward pass through time *)
